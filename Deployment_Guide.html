@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cloud Data Protection Review — Deployment Guide</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #1a1a1a;
+    background: #fff;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 48px 40px;
+  }
+
+  /* ── Header ── */
+  .header {
+    border-bottom: 3px solid #1a56db;
+    padding-bottom: 20px;
+    margin-bottom: 36px;
+  }
+  .header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 4px;
+  }
+  .header .subtitle {
+    font-size: 13px;
+    color: #555;
+  }
+
+  /* ── Section headings ── */
+  h2 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a56db;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 40px 0 16px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #dde3f0;
+  }
+  h3 {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 24px 0 8px;
+  }
+
+  /* ── Steps ── */
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    padding: 0;
+  }
+  .steps li {
+    counter-increment: step;
+    display: flex;
+    gap: 14px;
+    margin-bottom: 14px;
+    align-items: flex-start;
+  }
+  .steps li::before {
+    content: counter(step);
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    background: #1a56db;
+    color: #fff;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+  .steps li .body { flex: 1; }
+  .steps li .body strong { display: block; margin-bottom: 2px; }
+  .steps li .body p  { color: #444; margin-top: 2px; }
+
+  /* ── Code / commands ── */
+  code {
+    background: #f3f4f6;
+    border: 1px solid #dde3f0;
+    border-radius: 4px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 11.5px;
+    padding: 1px 5px;
+    color: #1a1a1a;
+  }
+  .cmd-block {
+    background: #f3f4f6;
+    border: 1px solid #dde3f0;
+    border-left: 4px solid #1a56db;
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 11.5px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 8px 0 4px;
+  }
+
+  /* ── Info / note boxes ── */
+  .note {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-left: 4px solid #1a56db;
+    border-radius: 4px;
+    padding: 10px 14px;
+    color: #1e40af;
+    margin: 16px 0;
+  }
+  .note strong { display: block; margin-bottom: 2px; }
+
+  .warn {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-left: 4px solid #f59e0b;
+    border-radius: 4px;
+    padding: 10px 14px;
+    color: #92400e;
+    margin: 16px 0;
+  }
+  .warn strong { display: block; margin-bottom: 2px; }
+
+  /* ── Parameter table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin: 12px 0;
+  }
+  th {
+    background: #f3f4f6;
+    border: 1px solid #dde3f0;
+    padding: 7px 10px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    border: 1px solid #dde3f0;
+    padding: 7px 10px;
+    vertical-align: top;
+  }
+  td.req { color: #dc2626; font-weight: 600; }
+  td.opt { color: #6b7280; }
+
+  /* ── Divider ── */
+  .divider {
+    border: none;
+    border-top: 1px solid #e5e7eb;
+    margin: 40px 0;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+    font-size: 11px;
+    color: #9ca3af;
+  }
+
+  /* ── Print ── */
+  @media print {
+    body { padding: 0; max-width: 100%; font-size: 12px; }
+    h2   { page-break-after: avoid; }
+    .steps li { page-break-inside: avoid; }
+    .note, .warn { page-break-inside: avoid; }
+    .no-print { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="header">
+  <h1>Cloud Data Protection Review — Deployment Guide</h1>
+  <div class="subtitle">Partner reference · Read-only · One account or a whole organization</div>
+</div>
+
+<div class="note no-print">
+  <strong>To create a PDF</strong>
+  Open this file in Chrome or Edge → File → Print → change Destination to <em>Save as PDF</em> → Save.
+</div>
+
+<p>The assessment creates one read-only IAM role from a CloudFormation template, runs a collector that reads configuration metadata through that role, and writes one HTML report. It reads no data, changes nothing, installs nothing and sends nothing outside AWS. The customer can remove the role at any time (<a href="#remove">Removing access</a>).</p>
+
+<table style="margin-top:12px;">
+  <tr><th></th><th>Single account</th><th>Organization</th><th>Organization without sts:AssumeRole</th></tr>
+  <tr><td>Where you run it</td><td>The account to assess</td><td>The management account</td><td>Step 1 where IAM Identity Center is administered; the run anywhere the reviewer can sign in</td></tr>
+  <tr><td>Commands to paste</td><td>1 (or 3 steps)</td><td>1 (or 3 steps)</td><td>1 for the administrator, then 1 for the reviewer (after a one-time CLI sign-in setup)</td></tr>
+  <tr><td>What it creates</td><td>One stack (the role)</td><td>One stack: the role in the management account, and a StackSet inside it that puts the role in every member account</td><td>One stack: a read-only IAM Identity Center permission set, assigned to the reviewer in each account. IAM Identity Center creates the role in each account itself</td></tr>
+  <tr><td>Collector flag</td><td>none (it sees the role has no organization access and assesses this account)</td><td>none (organization is the default)</td><td><code>--sso-profile</code></td></tr>
+  <tr><td>Typical run time</td><td>5–15 min</td><td>15–60 min, depending on account count</td><td>15–60 min</td></tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2 id="before">Before you start (every path)</h2>
+<p style="margin:6px 0;"><strong>Where the bundle comes from:</strong> <code>DataProtectionReview_Bundle.zip</code> is the file your partner sends you, and this guide is one of the files inside it. Keep the zip itself: it is what you upload to CloudShell below. (Partners build it from the repository with <code>python tools/make_bundle.py</code>, which writes <code>output/DataProtectionReview_Bundle.zip</code>.)</p>
+<ol class="steps">
+  <li><div class="body"><strong>Sign in to the AWS Console</strong> as someone allowed to create IAM roles and CloudFormation stacks. For an organization, sign in to the <strong>management account</strong>; the same person must be allowed to create a StackSet and to turn on StackSets for the organization (the organization command does that, once).</div></li>
+  <li><div class="body"><strong>Check who will run the collector.</strong> The collector reads each account by assuming the read-only role there, so the person running it needs permission to call <code>sts:AssumeRole</code> on that role (on the role in every account, for example <code>arn:aws:iam::*:role/DataProtectionReviewer</code>). Administrators usually have this. A restricted permission set, or a session policy on a single sign-on session, can leave it out; the run then stops with an access-denied message (see "The collector cannot assume the role" below).</div></li>
+  <li><div class="body"><strong>Open AWS CloudShell</strong> (the <code>&gt;_</code> icon at the top of the console). It already has the AWS CLI, Python 3.9 and the AWS library the collector uses. Nothing else to install.</div></li>
+  <li><div class="body"><strong>Upload the bundle:</strong> Actions → Upload file → <code>DataProtectionReview_Bundle.zip</code>. Then paste:</div></li>
+</ol>
+<div class="cmd-block" data-oneline="1">unzip -o DataProtectionReview_Bundle.zip</div>
+
+<h3 id="one-command">The quickest way: one command</h3>
+<p style="color:#444; margin-bottom:6px;">Easiest: run this with no options. It asks the customer and partner names, what to assess (this account, the whole organization, or the member accounts only), whether to include Cost Explorer, and which Regions to scan. It shows the plan and creates nothing until you say yes, then runs the assessment and zips the results into one file to download.</p>
+<div class="cmd-block">bash run.sh</div>
+<p style="color:#444; margin:6px 0;">The commands below do the same without the questions.</p>
+<p style="color:#444; margin-bottom:6px;">Run one of these in CloudShell, in the folder you unzipped. Each one does everything the steps below do, in the same order, and prints each AWS command before it runs it: it creates the read-only role, makes the External ID for you, checks access, runs the assessment and tells you where the report is.</p>
+<div class="cmd-block">bash run.sh account</div>
+<p style="color:#444; margin:6px 0;">One account. Or, for an organization (sign in to the management account):</p>
+<div class="cmd-block">bash run.sh org</div>
+<p style="color:#444; margin:6px 0;">An organization where you cannot create a role in the management account (the roles go into the member accounts only; see "If you cannot create a role in the management account" below):</p>
+<div class="cmd-block">bash run.sh org --no-management-role</div>
+<p style="color:#444; margin-top:6px;">Add <code>--org-name "Customer name" --partner-name "Partner name"</code> for the report's header and footer, unless the person who sent you the zip already set them. The External ID is saved next to the script in <code>.external_id</code>, so running it again reuses it and does not break the roles already created; it is printed at the end too. <code>--external-id</code> uses one you give, and <code>--output-dir</code> chooses where the report goes. The person running it needs permission to create the stack and to assume the role it creates (<code>sts:AssumeRole</code>). The steps below do the same thing one command at a time, for when you want to see or change each one.</p>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2 id="quick-start">Single account</h2>
+<p style="color:#444; margin-bottom:6px;">Paste each line into CloudShell, in order, in the same window.</p>
+
+<h3>1. Set the names and the External ID</h3>
+<p style="color:#444; margin-bottom:6px;">Change the two names in quotes first. They appear in the report's header. The line then makes a new External ID, finds the IAM role or user you are signed in as (who the role will trust), and picks the role&#39;s name. It is safe to run again: an existing <code>DataProtectionReviewer</code> stack is updated in place with the name it already has, a failed earlier attempt is removed first, and if a role of that name exists that no stack here created, the new role gets its own name (<code>DataProtectionReviewer-</code> and six letters or digits) instead of touching the existing one.</p>
+<div class="cmd-block" data-oneline="1">ORG="Customer name"; PARTNER="Partner name"; EXT=$(python3 -c "import secrets; print(secrets.token_hex(24))"); ME=$(aws sts get-caller-identity --query Arn --output text); case "$ME" in *:assumed-role/*) ME=$(aws iam get-role --role-name "$(echo "$ME" | cut -d/ -f2)" --query Role.Arn --output text);; esac; echo "Role will trust: $ME"; ROLE=DataProtectionReviewer; read -r ST R &lt;&lt;&lt; "$(aws cloudformation describe-stacks --stack-name DataProtectionReviewer --query "Stacks[0].[StackStatus,Parameters[?ParameterKey=='RoleName'].ParameterValue|[0]]" --output text 2&gt;/dev/null)"; if [ "$ST" = ROLLBACK_COMPLETE ]; then echo "Removing a failed earlier attempt"; aws cloudformation delete-stack --stack-name DataProtectionReviewer &amp;&amp; aws cloudformation wait stack-delete-complete --stack-name DataProtectionReviewer; ST=; fi; if [ -n "$ST" ]; then [ -n "$R" ] &amp;&amp; [ "$R" != None ] &amp;&amp; ROLE=$R; echo "Updating the existing stack"; elif aws iam get-role --role-name "$ROLE" &gt;/dev/null 2&gt;&amp;1; then ROLE="DataProtectionReviewer-$(python3 -c "import secrets; print(secrets.token_hex(3))")"; echo "A role named DataProtectionReviewer exists outside this stack, so this one is named $ROLE"; fi; echo "Role name: $ROLE"</div>
+
+<h3>2. Create the read-only role</h3>
+<div class="cmd-block" data-oneline="1">aws cloudformation deploy --stack-name DataProtectionReviewer --template-file data_risk_assessment_role.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides TrustedPrincipalArn="$ME" ExternalId="$EXT" RoleName="$ROLE" &amp;&amp; echo "ExternalId: $EXT"</div>
+<p style="color:#444; margin-top:6px;">Keep the External ID it prints. It is not a secret, but a later run needs it.</p>
+
+<h3>3. Run the assessment</h3>
+<div class="cmd-block" data-oneline="1">python3 collector.py --external-id "$EXT" --role-name "$ROLE" --org-name "$ORG" --partner-name "$PARTNER"</div>
+<p style="color:#444; margin-top:6px;">When it finishes, download <code>output/report.html</code> with Actions → Download file and open it in a browser. The CSV files beside it are described under <a href="#outputs">What the run writes</a>.</p>
+
+<details style="margin:10px 0;"><summary style="cursor:pointer; color:#444;">All three in one line</summary>
+<div class="cmd-block" data-oneline="1">ORG="Customer name"; PARTNER="Partner name"; EXT=$(python3 -c "import secrets; print(secrets.token_hex(24))"); ME=$(aws sts get-caller-identity --query Arn --output text); case "$ME" in *:assumed-role/*) ME=$(aws iam get-role --role-name "$(echo "$ME" | cut -d/ -f2)" --query Role.Arn --output text);; esac; echo "Role will trust: $ME"; ROLE=DataProtectionReviewer; read -r ST R &lt;&lt;&lt; "$(aws cloudformation describe-stacks --stack-name DataProtectionReviewer --query "Stacks[0].[StackStatus,Parameters[?ParameterKey=='RoleName'].ParameterValue|[0]]" --output text 2&gt;/dev/null)"; if [ "$ST" = ROLLBACK_COMPLETE ]; then echo "Removing a failed earlier attempt"; aws cloudformation delete-stack --stack-name DataProtectionReviewer &amp;&amp; aws cloudformation wait stack-delete-complete --stack-name DataProtectionReviewer; ST=; fi; if [ -n "$ST" ]; then [ -n "$R" ] &amp;&amp; [ "$R" != None ] &amp;&amp; ROLE=$R; echo "Updating the existing stack"; elif aws iam get-role --role-name "$ROLE" &gt;/dev/null 2&gt;&amp;1; then ROLE="DataProtectionReviewer-$(python3 -c "import secrets; print(secrets.token_hex(3))")"; echo "A role named DataProtectionReviewer exists outside this stack, so this one is named $ROLE"; fi; echo "Role name: $ROLE"; aws cloudformation deploy --stack-name DataProtectionReviewer --template-file data_risk_assessment_role.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides TrustedPrincipalArn="$ME" ExternalId="$EXT" RoleName="$ROLE" &amp;&amp; echo "ExternalId: $EXT" &amp;&amp; python3 collector.py --external-id "$EXT" --role-name "$ROLE" --org-name "$ORG" --partner-name "$PARTNER"</div>
+</details>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2 id="organization">Organization</h2>
+<p style="color:#444; margin-bottom:6px;">Run these in the <strong>management account</strong>, in the same window. One stack creates the role in the management account and, through a StackSet it contains, in every member account, now and as accounts join. The management account needs its own copy because a StackSet cannot deploy to the account that owns it; the template does both.</p>
+
+<div class="warn">
+  <strong>Not yet confirmed against a real organization</strong>
+  Every line has been checked against the AWS CLI's syntax and run against a recording fake, the template has been checked with cfn-lint, and the
+  collector's organization mode has been run against a simulated organization. These parts have not yet run in a real AWS organization: the
+  StackSet inside the stack, including that the deploy waits until the member roles exist and that deleting the stack removes it; the collector
+  reaching members from a single sign-on login (in the one test organization, the login was not allowed to assume the member roles); and runs
+  longer than an hour. Roles arriving in member accounts has run once, from a StackSet made with the role template, not from this stack. If a step fails, the line stops
+  there and nothing after it runs.
+</div>
+
+<h3>1. Set the names and the External ID</h3>
+<p style="color:#444; margin-bottom:6px;">The same line as for a single account.</p>
+<div class="cmd-block" data-oneline="1">ORG="Customer name"; PARTNER="Partner name"; EXT=$(python3 -c "import secrets; print(secrets.token_hex(24))"); ME=$(aws sts get-caller-identity --query Arn --output text); case "$ME" in *:assumed-role/*) ME=$(aws iam get-role --role-name "$(echo "$ME" | cut -d/ -f2)" --query Role.Arn --output text);; esac; echo "Role will trust: $ME"; ROLE=DataProtectionReviewer; read -r ST R &lt;&lt;&lt; "$(aws cloudformation describe-stacks --stack-name DataProtectionReviewer --query "Stacks[0].[StackStatus,Parameters[?ParameterKey=='RoleName'].ParameterValue|[0]]" --output text 2&gt;/dev/null)"; if [ "$ST" = ROLLBACK_COMPLETE ]; then echo "Removing a failed earlier attempt"; aws cloudformation delete-stack --stack-name DataProtectionReviewer &amp;&amp; aws cloudformation wait stack-delete-complete --stack-name DataProtectionReviewer; ST=; fi; if [ -n "$ST" ]; then [ -n "$R" ] &amp;&amp; [ "$R" != None ] &amp;&amp; ROLE=$R; echo "Updating the existing stack"; elif aws iam get-role --role-name "$ROLE" &gt;/dev/null 2&gt;&amp;1; then ROLE="DataProtectionReviewer-$(python3 -c "import secrets; print(secrets.token_hex(3))")"; echo "A role named DataProtectionReviewer exists outside this stack, so this one is named $ROLE"; fi; echo "Role name: $ROLE"</div>
+
+<h3>2. Create the role in every account</h3>
+<p style="color:#444; margin-bottom:6px;">This turns on StackSets for the organization (once), then deploys <code>data_risk_assessment_org.yaml</code>: the role in the management account with read access to the organization's structure and service control policies, and a StackSet aimed at the organization root that creates the same role, unchanged, in every member account. New accounts get it automatically. An account where the role cannot be created does not stop the others; it shows as "not assessed" in the report.</p>
+<div class="cmd-block" data-oneline="1">aws cloudformation activate-organizations-access &amp;&amp; aws cloudformation deploy --stack-name DataProtectionReviewer --template-file data_risk_assessment_org.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides TrustedPrincipalArn="$ME" ExternalId="$EXT" RoleName="$ROLE" OrganizationRootId="$(aws organizations list-roots --query 'Roots[0].Id' --output text)" &amp;&amp; echo "ExternalId: $EXT"</div>
+<p style="color:#444; margin-top:6px;">Keep the External ID it prints. It is not a secret, but a later run needs it. To limit the member roles to one organizational unit, replace the <code>OrganizationRootId</code> value with that unit's ID (<code>ou-…</code>).</p>
+<p style="color:#444; margin-top:10px; margin-bottom:6px;">To see which accounts have the role (each should be <code>CURRENT</code>):</p>
+<div class="cmd-block" data-oneline="1">aws cloudformation list-stack-instances --stack-set-name DataProtectionReviewer-members --query 'Summaries[].[Account,Status,StatusReason]' --output table</div>
+
+<h3>3. Run the assessment</h3>
+<div class="cmd-block" data-oneline="1">python3 collector.py --external-id "$EXT" --role-name "$ROLE" --org-name "$ORG" --partner-name "$PARTNER"</div>
+<p style="color:#444; margin-top:6px;"><strong>Your sign-in needs permission to assume the role in the other accounts.</strong> Reaching a role in another account needs <code>sts:AssumeRole</code> in your own permissions as well as the role's trust. If the run says AccessDenied for every member, ask your administrator to add this statement to your permission set or IAM policy: <code>{"Effect": "Allow", "Action": "sts:AssumeRole", "Resource": "arn:aws:iam::*:role/DataProtectionReviewer*"}</code>. If the organization does not allow that at all, use <a href="#organization-sso">Organization without sts:AssumeRole</a> instead.</p>
+<p style="color:#444; margin-top:6px;">The same command as for a single account. The management account's role lists the organization; the collector then uses the same role name in each member account.</p>
+
+<details style="margin:10px 0;"><summary style="cursor:pointer; color:#444;">All three in one line</summary>
+<div class="cmd-block" data-oneline="1">ORG="Customer name"; PARTNER="Partner name"; EXT=$(python3 -c "import secrets; print(secrets.token_hex(24))"); ME=$(aws sts get-caller-identity --query Arn --output text); case "$ME" in *:assumed-role/*) ME=$(aws iam get-role --role-name "$(echo "$ME" | cut -d/ -f2)" --query Role.Arn --output text);; esac; echo "Role will trust: $ME"; ROLE=DataProtectionReviewer; read -r ST R &lt;&lt;&lt; "$(aws cloudformation describe-stacks --stack-name DataProtectionReviewer --query "Stacks[0].[StackStatus,Parameters[?ParameterKey=='RoleName'].ParameterValue|[0]]" --output text 2&gt;/dev/null)"; if [ "$ST" = ROLLBACK_COMPLETE ]; then echo "Removing a failed earlier attempt"; aws cloudformation delete-stack --stack-name DataProtectionReviewer &amp;&amp; aws cloudformation wait stack-delete-complete --stack-name DataProtectionReviewer; ST=; fi; if [ -n "$ST" ]; then [ -n "$R" ] &amp;&amp; [ "$R" != None ] &amp;&amp; ROLE=$R; echo "Updating the existing stack"; elif aws iam get-role --role-name "$ROLE" &gt;/dev/null 2&gt;&amp;1; then ROLE="DataProtectionReviewer-$(python3 -c "import secrets; print(secrets.token_hex(3))")"; echo "A role named DataProtectionReviewer exists outside this stack, so this one is named $ROLE"; fi; echo "Role name: $ROLE"; aws cloudformation activate-organizations-access &amp;&amp; aws cloudformation deploy --stack-name DataProtectionReviewer --template-file data_risk_assessment_org.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides TrustedPrincipalArn="$ME" ExternalId="$EXT" RoleName="$ROLE" OrganizationRootId="$(aws organizations list-roots --query 'Roots[0].Id' --output text)" &amp;&amp; echo "ExternalId: $EXT" &amp;&amp; python3 collector.py --external-id "$EXT" --role-name "$ROLE" --org-name "$ORG" --partner-name "$PARTNER"</div>
+</details>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2 id="organization-sso">Organization without sts:AssumeRole (IAM Identity Center)</h2>
+<p style="color:#444; margin-bottom:6px;">Use this when your organization does not let the person running the review assume a role in other accounts (the run or the preflight says AccessDenied on <code>sts:AssumeRole</code> for every member, and an administrator cannot allow it). Nothing here calls <code>sts:AssumeRole</code>. Instead, an IAM Identity Center administrator gives the reviewer a read-only <strong>permission set</strong> in each account, and the collector reads each account with it through the IAM Identity Center access portal, the same way the AWS CLI gets credentials after <code>aws sso login</code>. The permission set holds the same read-only policy as the role, with the same explicit Deny on data and on every write; <code>SECURITY_REVIEW.md</code> explains it. No IAM role and no StackSet are created by hand, and no External ID is needed.</p>
+
+<div class="warn">
+  <strong>Not yet confirmed against a real organization</strong>
+  The template has been checked with cfn-lint and the collector's IAM Identity Center mode has been run against a simulated organization with a simulated access portal. It has not yet run against real IAM Identity Center. If a step fails, the line stops there and nothing after it runs.
+</div>
+
+<h3>1. Give the reviewer the read-only permission set (IAM Identity Center administrator)</h3>
+<p style="color:#444; margin-bottom:6px;">Run this in CloudShell in the account where IAM Identity Center is administered (the management account, or its delegated administrator), in IAM Identity Center's Region. Change the name in quotes to the user name the reviewer signs in to the AWS access portal with. The line finds the IAM Identity Center instance and the reviewer, lists the organization's active accounts except the management account, and deploys <code>data_risk_assessment_permission_set.yaml</code>, which creates the <code>DataProtectionReviewer</code> permission set and assigns it to the reviewer in each of those accounts. It needs IAM Identity Center administration rights (create permission sets and account assignments) and read access to AWS Organizations; it creates no IAM role in the management account.</p>
+<div class="cmd-block" data-oneline="1">REVIEWER="name the reviewer signs in with"; read -r INST IDS &lt;&lt;&lt; "$(aws sso-admin list-instances --query 'Instances[0].[InstanceArn,IdentityStoreId]' --output text)"; WHO=$(aws identitystore get-user-id --identity-store-id "$IDS" --alternate-identifier "UniqueAttribute={AttributePath=userName,AttributeValue=$REVIEWER}" --query UserId --output text) &amp;&amp; MGMT=$(aws organizations describe-organization --query Organization.MasterAccountId --output text) &amp;&amp; ACCTS=$(aws organizations list-accounts --query "Accounts[?Status=='ACTIVE' &amp;&amp; Id!='$MGMT'].Id" --output text) &amp;&amp; ACCTS=$(echo $ACCTS | tr ' ' ',') &amp;&amp; aws cloudformation deploy --stack-name DataProtectionReviewerAccess --template-file data_risk_assessment_permission_set.yaml --capabilities CAPABILITY_AUTO_EXPAND --parameter-overrides InstanceArn="$INST" PrincipalId="$WHO" AccountIds="$ACCTS" &amp;&amp; echo "DataProtectionReviewer assigned to $REVIEWER in: $ACCTS"</div>
+<p style="color:#444; margin-top:6px;">The management account is left out because assigning a permission set there needs IAM rights in that account; the report lists it as not assessed. To assign it to a group instead of one person, deploy the same template with <code>PrincipalType=GROUP</code> and the group's ID. To name the accounts yourself, set <code>AccountIds</code> to their IDs separated by commas.</p>
+
+<h3>2. Set up the reviewer's AWS CLI sign-in (once)</h3>
+<p style="color:#444; margin-bottom:6px;">In CloudShell, or any shell with the AWS CLI version 2. It asks for the access portal's start URL and Region (shown on the portal's "Access keys" page), gives a code to approve in your browser, then asks for an account and role: pick the management account with the permission set you normally use there. That sign-in is used only to list the organization's accounts, names and policies; every account is read with the <code>DataProtectionReviewer</code> permission set. If you cannot open the management account, pick any account; the report then lists the organization-wide figures as not assessed.</p>
+<div class="cmd-block" data-oneline="1">aws configure sso --profile dpr --use-device-code</div>
+
+<h3>3. Run the assessment</h3>
+<div class="cmd-block" data-oneline="1">ORG="Customer name"; PARTNER="Partner name"; aws sso login --profile dpr --use-device-code &amp;&amp; python3 collector.py --sso-profile dpr --org-name "$ORG" --partner-name "$PARTNER"</div>
+<p style="color:#444; margin-top:6px;">It signs in (approve the code in your browser), then reads every account where the permission set is assigned to you. Accounts without it are listed as not assessed, never as protected or unprotected. To limit the run, add <code>--accounts</code> and the account IDs. Download <code>output/report.html</code> as for the other paths.</p>
+
+<details style="margin:10px 0;"><summary style="cursor:pointer; color:#444;">Steps 1 and 3 in one line, when the administrator is also the reviewer</summary>
+<p style="color:#444; margin:6px 0;">Do step 2 first. Then:</p>
+<div class="cmd-block" data-oneline="1">ORG="Customer name"; PARTNER="Partner name"; REVIEWER="name the reviewer signs in with"; read -r INST IDS &lt;&lt;&lt; "$(aws sso-admin list-instances --query 'Instances[0].[InstanceArn,IdentityStoreId]' --output text)"; WHO=$(aws identitystore get-user-id --identity-store-id "$IDS" --alternate-identifier "UniqueAttribute={AttributePath=userName,AttributeValue=$REVIEWER}" --query UserId --output text) &amp;&amp; MGMT=$(aws organizations describe-organization --query Organization.MasterAccountId --output text) &amp;&amp; ACCTS=$(aws organizations list-accounts --query "Accounts[?Status=='ACTIVE' &amp;&amp; Id!='$MGMT'].Id" --output text) &amp;&amp; ACCTS=$(echo $ACCTS | tr ' ' ',') &amp;&amp; aws cloudformation deploy --stack-name DataProtectionReviewerAccess --template-file data_risk_assessment_permission_set.yaml --capabilities CAPABILITY_AUTO_EXPAND --parameter-overrides InstanceArn="$INST" PrincipalId="$WHO" AccountIds="$ACCTS" &amp;&amp; echo "DataProtectionReviewer assigned to $REVIEWER in: $ACCTS" &amp;&amp; aws sso login --profile dpr --use-device-code &amp;&amp; python3 collector.py --sso-profile dpr --org-name "$ORG" --partner-name "$PARTNER"</div>
+</details>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2 id="outputs">What the run writes</h2>
+<p style="color:#444; margin-bottom:8px;">Everything goes to the <code>output/</code> folder. These files contain account IDs, resource names and tag values: keep them somewhere appropriate and share them no more widely than the report.</p>
+<table>
+  <tr><th>File</th><th>What it holds</th></tr>
+  <tr><td><code>report.html</code></td><td>The report. Open it in a browser. It loads nothing from the internet.</td></tr>
+  <tr><td><code>assets.csv</code></td><td>One row per resource: protection state, how environment and owner were inferred, restore evidence.</td></tr>
+  <tr><td><code>coverage-gaps.csv</code></td><td>Every call that was denied or failed. A resource the tool could not check is "not assessed", never unprotected.</td></tr>
+  <tr><td><code>exclusion-worksheet.csv</code></td><td>Production resources with no copy, with blank columns to record a decision. Pass it back with <code>--overrides</code>.</td></tr>
+  <tr><td><code>assessment.json</code></td><td>This run's results, for comparison with a later run (<code>--baseline</code>).</td></tr>
+  <tr><td>Other CSVs</td><td><code>proposed-groups.csv</code>, <code>orphaned-copies.csv</code>, <code>shared-backups.csv</code>, <code>vault-security.csv</code>, <code>by-owner.csv</code>.</td></tr>
+</table>
+
+<h3>Optional settings for a second run</h3>
+<p style="color:#444; margin-bottom:6px;">Record what the customer confirmed, compare with the first run, set recovery targets, or write a copy with names replaced by labels:</p>
+<div class="cmd-block">python3 collector.py --external-id "$EXT" --role-name "$ROLE" --org-name "$ORG" --partner-name "$PARTNER" --overrides decisions.csv --baseline previous/assessment.json --recovery-targets targets.json</div>
+<p style="color:#444; margin-top:6px;"><code>--overrides</code> reads a CSV or JSON file keyed by resource ARN (criticality, data_sensitivity, tier, or excluded with reason, owner and review_date). <code>--baseline</code> compares with an earlier <code>assessment.json</code>. <code>--recovery-targets</code> reads JSON by tier, for example <code>{"1": {"rpo_hours": 1, "rto_hours": 4, "min_retention_days": 90}, "3": {"max_retention_days": 35}}</code>; tiers 1 and 2 take a minimum retention, tier 3 a maximum, and anything left out keeps its default. <code>--redact</code> (with <code>--redact-key key.csv</code> to keep the mapping) replaces account, resource, vault and plan names with stable labels; check a redacted report before sharing it. <code>--regions us-east-1 us-west-2</code> limits the Regions scanned; by default every enabled Region that holds resources is scanned.</p>
+
+<h3 id="no-management-role">If you cannot create a role in the management account</h3>
+<p style="color:#444; margin-bottom:6px;">Some organizations let an administrator deploy a StackSet to the member accounts but not create an IAM role in the management account. This option fits that case. The roles go into the member accounts only, and the collector lists the organization with <strong>your own sign-in</strong> instead of a role. It uses the same read calls, but your sign-in is not limited by the role's explicit denies, so use the role in the management account (above) wherever you can. Sign in to the management account with read access to AWS Organizations; Cost Explorer and the organization's policies are read with your sign-in too, and show as not assessed where it cannot read them.</p>
+<p style="color:#444; margin-bottom:6px;"><strong>The management account itself is not assessed</strong>, because it has no role. The report lists it as not assessed, with the reason, so it counts as a gap in the totals, not as protected or unprotected. Do step 1 above, then:</p>
+<div class="cmd-block" data-oneline="1">aws cloudformation activate-organizations-access &amp;&amp; aws cloudformation create-stack-set --stack-set-name DataProtectionReviewer-members --template-body file://data_risk_assessment_role.yaml --capabilities CAPABILITY_NAMED_IAM --permission-model SERVICE_MANAGED --auto-deployment Enabled=true,RetainStacksOnAccountRemoval=false --parameters ParameterKey=TrustedPrincipalArn,ParameterValue="$ME" ParameterKey=ExternalId,ParameterValue="$EXT" ParameterKey=RoleName,ParameterValue="$ROLE" ParameterKey=IsManagementAccount,ParameterValue=false &amp;&amp; OP=$(aws cloudformation create-stack-instances --stack-set-name DataProtectionReviewer-members --deployment-targets OrganizationalUnitIds="$(aws organizations list-roots --query 'Roots[0].Id' --output text)" --regions "${AWS_REGION:-us-east-1}" --operation-preferences FailureTolerancePercentage=100,MaxConcurrentPercentage=100 --query OperationId --output text) &amp;&amp; until S=$(aws cloudformation describe-stack-set-operation --stack-set-name DataProtectionReviewer-members --operation-id "$OP" --query StackSetOperation.Status --output text); [ "$S" != RUNNING ] &amp;&amp; [ "$S" != QUEUED ]; do sleep 10; done; echo "Member roles: $S"</div>
+<p style="color:#444; margin:10px 0 6px;">Then check the accounts as above. Members that are not in the StackSet, or where the role did not arrive, have no role: the run reads the others and lists those as not assessed (neither protected nor unprotected). The preflight passes once the role works in any one member. Run:</p>
+<div class="cmd-block" data-oneline="1">python3 collector.py --org-with-current-credentials --external-id "$EXT" --role-name "$ROLE" --org-name "$ORG" --partner-name "$PARTNER"</div>
+<p style="color:#444; margin:10px 0 6px;">If the roles are in some accounts only, name the accounts to assess. This line takes them from the StackSet, and the others are left out and counted on the Inputs page:</p>
+<div class="cmd-block" data-oneline="1">python3 collector.py --org-with-current-credentials --accounts $(aws cloudformation list-stack-instances --stack-set-name DataProtectionReviewer-members --query "Summaries[].Account" --output text) --external-id "$EXT" --role-name "$ROLE" --org-name "$ORG" --partner-name "$PARTNER"</div>
+<p style="color:#444; margin-top:6px;">The same line works when the identity running the collector <strong>cannot read AWS Organizations at all</strong>, for example a dedicated reviewer role in a separate account. The collector then assesses the accounts you name and reads nothing from the organization. Organizational units, service control policies, organization backup policies, costs and multi-party approval are reported as not assessed, not as "none found". Use the account IDs from the StackSet's instance list, and make that reviewer role the <code>TrustedPrincipalArn</code> when you deploy. Accounts then show as numbers; add <code>--account-names names.csv</code>, a file with one <code>account ID,name</code> per line, to show names instead.</p>
+<p style="color:#444; margin-top:6px;">To remove it, use the organization removal line under "Removing access" to take the roles out of the member accounts, then <code>aws cloudformation delete-stack-set --stack-set-name DataProtectionReviewer-members</code>. Skip <code>delete-stack</code>, which has nothing to remove here.</p>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2 id="remove">Removing access</h2>
+<p style="color:#444; margin-bottom:6px;">Easiest: run this in CloudShell. It looks in every Region for what the assessment created, shows what it found, and asks before it removes anything. The local results and files are only deleted if you say so, and never while a role is still in AWS.</p>
+<div class="cmd-block">bash cleanup.sh</div>
+<p style="color:#444; margin:10px 0 6px;">Or by hand. Single account, or the management account's stack:</p>
+<div class="cmd-block" data-oneline="1">aws cloudformation delete-stack --stack-name DataProtectionReviewer</div>
+<p style="color:#444; margin:10px 0 6px;">Organization: remove the member accounts' roles first and wait for that to finish, then delete the stack, which removes the management account's role and the StackSet:</p>
+<div class="cmd-block" data-oneline="1">OP=$(aws cloudformation delete-stack-instances --stack-set-name DataProtectionReviewer-members --deployment-targets OrganizationalUnitIds="$(aws organizations list-roots --query 'Roots[0].Id' --output text)" --regions "${AWS_REGION:-us-east-1}" --no-retain-stacks --operation-preferences FailureTolerancePercentage=100,MaxConcurrentPercentage=100 --query OperationId --output text) &amp;&amp; until S=$(aws cloudformation describe-stack-set-operation --stack-set-name DataProtectionReviewer-members --operation-id "$OP" --query StackSetOperation.Status --output text); [ "$S" != RUNNING ] &amp;&amp; [ "$S" != QUEUED ]; do sleep 10; done; echo "Member roles removed: $S"</div>
+<div class="cmd-block" data-oneline="1">aws cloudformation delete-stack --stack-name DataProtectionReviewer</div>
+<p style="color:#444; margin:10px 0 6px;">Organization without sts:AssumeRole (the IAM Identity Center administrator runs it; it removes every assignment and the permission set):</p>
+<div class="cmd-block" data-oneline="1">aws cloudformation delete-stack --stack-name DataProtectionReviewerAccess</div>
+<p style="color:#444; margin-top:6px;">Use the same Region as when the role was created (CloudShell keeps the Region you chose in the console).</p>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2 id="trouble">If something goes wrong</h2>
+
+<details style="margin:8px 0;"><summary style="cursor:pointer;"><strong>Step 1 prints an error, or "Role will trust:" is empty</strong></summary>
+<p style="color:#444; margin:6px 0;">Looking up your role needs <code>iam:GetRole</code>. If that is denied, find the ARN another way and set it yourself, for example <code>ME="arn:aws:iam::123456789012:role/YourRole"</code>. For single sign-on, <code>aws iam list-roles --path-prefix /aws-reserved/sso.amazonaws.com/ --query 'Roles[].Arn'</code> lists the roles behind each permission set. An IAM user's own ARN is used as is.</p>
+</details>
+
+<details style="margin:8px 0;"><summary style="cursor:pointer;"><strong>The role already exists, or a step is run again</strong></summary>
+<p style="color:#444; margin:6px 0;">Step 1 handles this before anything is created, so the usual answer is to run step 1 and the lines after it again:</p>
+<ul style="color:#444; margin:6px 0 6px 18px;">
+  <li><strong>The stack already exists</strong> (an earlier run): it is updated in place, keeping the role name it has. Nothing fails because the role exists. If nothing changed, CloudFormation says there are no changes and the line carries on.</li>
+  <li><strong>A first attempt failed</strong> (the stack is in <code>ROLLBACK_COMPLETE</code>, which cannot be updated): step 1 removes that empty stack first. It holds no role.</li>
+  <li><strong>A role named <code>DataProtectionReviewer</code> exists that no stack here created</strong> (made by hand, by a stack with another name, or by this stack in another Region): step 1 leaves it alone and names the new role <code>DataProtectionReviewer-</code> plus six letters or digits. The deploy and run lines use that name through <code>$ROLE</code>.</li>
+</ul>
+<p style="color:#444; margin:6px 0;">Step 1 makes a <strong>new</strong> External ID each time, so after running it again the old External ID stops working and the collector needs the new one, which the deploy line prints. To keep the old one, skip step 1 and set <code>EXT</code>, <code>ORG</code>, <code>PARTNER</code>, <code>ME</code> and <code>ROLE</code> yourself.</p>
+<p style="color:#444; margin:6px 0;">If the deploy still says a policy such as <code>DataProtectionReviewer-Inventory</code> already exists, a policy was left behind without its role: delete it, or set <code>ROLE</code> to another name and run the deploy and run lines again.</p>
+<p style="color:#444; margin:6px 0;"><strong>In an organization</strong>, step 1 checks the management account only. A member account that already has a role of that name shows as failed in the member list (step 2's check line) and as "not assessed" in the report; the other accounts are not affected. To cover it, pick a name no account uses, for example <code>ROLE=DataProtectionReviewer2</code>, and run steps 2 and 3 again in the same window. The roles in every account are replaced with the new name. The organization deploy line can also be run over a management-account stack made from the role template alone (same stack name); it should update that stack in place and add the member roles, which is part of what has not yet been confirmed.</p>
+</details>
+
+<details style="margin:8px 0;"><summary style="cursor:pointer;"><strong>The collector cannot assume the role</strong></summary>
+<p style="color:#444; margin:6px 0;">Check access before a full run:</p>
+<div class="cmd-block">python3 collector.py --preflight --external-id "$EXT" --role-name "$ROLE"</div>
+<p style="color:#444; margin:6px 0;">The External ID must be the one the stack was created with. Running step 1 again makes a new one; to keep the old one, set <code>EXT=&lt;your id&gt;</code> instead of running step 1, and set <code>ORG</code> and <code>PARTNER</code> again too.</p>
+</details>
+
+<details style="margin:8px 0;"><summary style="cursor:pointer;"><strong>Access denied when assuming a role, and the role exists</strong></summary>
+<p style="color:#444; margin:6px 0;">AWS gives the same access-denied answer in four cases, so the message cannot say which: the role is not deployed in that account, the External ID differs from the one in the role's trust policy, the role's trust policy does not name the identity you are signed in as, or your own identity is not allowed to call <code>sts:AssumeRole</code> on the role. The last is the one the role's template cannot fix: it is set on the person running the collector (their permission set, user or role policy, or a session policy). In the AWS console, the access-denied page's "View all policies for request" shows which policies were evaluated.</p>
+</details>
+
+<details style="margin:8px 0;"><summary style="cursor:pointer;"><strong>The report covers only one account, but I wanted the organization</strong></summary>
+<p style="color:#444; margin:6px 0;">The collector reads the organization only through a role created with <code>IsManagementAccount=true</code>, in the management account. The organization template always creates it that way; a single-account stack made from the role template alone does not. If it was created without it, it says "This account cannot list an organization" and assesses that one account. Run organization step 2 (it always creates the management role with it), then run again. To assess only the management account on purpose, add <code>--single-account</code>.</p>
+</details>
+
+<details style="margin:8px 0;"><summary style="cursor:pointer;"><strong>Credentials last one hour</strong></summary>
+<p style="color:#444; margin:6px 0;">The collector assumes the role for one hour per account, and a sign-in that was itself started from single sign-on or another role cannot be extended past that. A single account finishes well inside it. A very large organization run that goes past an hour can see later calls fail: the report lists those under Coverage gaps and shows the affected resources as not assessed, not as unprotected. Sign in just before you run.</p>
+</details>
+
+<details style="margin:8px 0;"><summary style="cursor:pointer;"><strong>Member accounts failed in step 2</strong></summary>
+<p style="color:#444; margin:6px 0;">The <code>list-stack-instances</code> line shows each account's reason. A common one is a service control policy that denies the Region CloudShell is in; switch CloudShell to an allowed Region, delete the stack with the removal lines, and run step 2 again. From a delegated administrator account instead of the management account, add <code>StackSetCallAs=DELEGATED_ADMIN</code> after <code>--parameter-overrides</code> in step 2 and <code>--call-as DELEGATED_ADMIN</code> to the <code>list-stack-instances</code> and removal lines.</p>
+</details>
+
+<details style="margin:8px 0;"><summary style="cursor:pointer;"><strong>Running from your own machine instead of CloudShell</strong></summary>
+<p style="color:#444; margin:6px 0;">You need the AWS CLI, Python 3.9 or newer, and the pinned AWS library: <code>pip3 install "boto3==1.43.108"</code>. CloudShell needs none of this. The commands are bash; on Windows use WSL or Git Bash. If the collector fails with a TLS or certificate error behind a corporate proxy, run it with the system Python, or install <code>python-certifi-win32</code> (Windows) so Python uses the operating system's certificate store.</p>
+</details>
+
+<details style="margin:8px 0;"><summary style="cursor:pointer;"><strong>Creating the role in the console instead</strong></summary>
+<p style="color:#444; margin:6px 0;">CloudFormation → Create stack → With new resources → Upload <code>data_risk_assessment_role.yaml</code>. Fill in <code>TrustedPrincipalArn</code> (the "Role will trust" value from step 1) and <code>ExternalId</code> (from step 1: <code>echo $EXT</code>), acknowledge IAM resources, and create. For an organization, upload <code>data_risk_assessment_org.yaml</code> instead, fill in the same two values and <code>OrganizationRootId</code> (from <code>aws organizations list-roots</code>), and turn on trusted access for StackSets first (CloudFormation → StackSets → Enable trusted access). Then run step 3 of either path.</p>
+</details>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2>What the role can and cannot do</h2>
+<p style="margin-bottom:12px;">The template includes an <strong>explicit Deny</strong> that no other policy attached to the role can override. Every permission and the reason for it is in <code>SECURITY_REVIEW.md</code>.</p>
+<table>
+  <tr><th>Allowed</th><th>Explicitly denied</th></tr>
+  <tr>
+    <td>
+      Read resource metadata (names, tags, configuration)<br>
+      Read backup plan and vault configuration<br>
+      Read CloudWatch metrics and alarms<br>
+      Read Cost Explorer spend data<br>
+      Read Organizations structure and SCPs (management account only)
+    </td>
+    <td>
+      Read any object, record, or file contents<br>
+      Decrypt anything (KMS Decrypt is denied)<br>
+      Read secrets (Secrets Manager, SSM Parameter Store)<br>
+      Create, modify, or delete any resource<br>
+      Start or stop any backup or restore job
+    </td>
+  </tr>
+</table>
+<div class="note" style="margin-top:16px;">
+  <strong>What an External ID is, and is not</strong>
+  It stops a third party from tricking the collector into using this role on their behalf. It is not a password: AWS can record it in
+  CloudTrail when the role is assumed. What protects the role is who it trusts (<code>TrustedPrincipalArn</code>) and the explicit Deny.
+  Anyone who can edit the role could detach that Deny, so if it must be permanent, apply a permissions boundary or an SCP as well.
+</div>
+<div class="note" style="margin-top:16px;">
+  <strong>What is not supported</strong>
+  The standard AWS partition only: AWS GovCloud (US) and the China Regions are not supported. Regions disabled for an account are skipped,
+  and any Region that could not be reached is listed in the report under Coverage gaps.
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="footer">
+  Cloud Data Protection Review · Commvault · Partner deployment reference
+</div>
+
+</body>
+</html>

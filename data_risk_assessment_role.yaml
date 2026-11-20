@@ -1,0 +1,542 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  Cloud Data Protection Review - read-only IAM role.
+  Grants metadata-only read access so the collector can assess how data protection is
+  configured. It never reads object contents, table items, or database records, never
+  decrypts anything, and never performs any write, modify, or delete action.
+  An explicit Deny block at the end enforces this regardless of any other policy.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Required
+        Parameters:
+          - TrustedPrincipalArn
+          - ExternalId
+      - Label:
+          default: Optional
+        Parameters:
+          - RoleName
+          - RequireMFA
+          - EnableCostExplorer
+          - IsManagementAccount
+          - PermissionsBoundaryArn
+    ParameterLabels:
+      TrustedPrincipalArn:
+        default: Who may assume this role
+      ExternalId:
+        default: External ID (shared secret)
+      IsManagementAccount:
+        default: Is this the management or delegated admin account?
+
+Parameters:
+
+  TrustedPrincipalArn:
+    Type: String
+    Description: >
+      ARN of the IAM user or role that will run the collector. Find it by running
+      'aws sts get-caller-identity'. For an assumed role, use the underlying role ARN
+      (arn:aws:iam::ACCOUNT:role/NAME), not the assumed-role session ARN.
+    AllowedPattern: "^arn:aws[a-zA-Z-]*:iam::[0-9]{12}:(root|user\\/.+|role\\/.+)$"
+    ConstraintDescription: >
+      Must be an IAM ARN, for example arn:aws:iam::123456789012:role/MyRole or
+      arn:aws:iam::123456789012:root
+
+  ExternalId:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 128
+    Description: >
+      Shared secret required on sts:AssumeRole. Generate one with:
+      python3 -c "import secrets; print(secrets.token_hex(24))"
+      Keep it; the collector needs the same value.
+
+  RoleName:
+    Type: String
+    Default: DataProtectionReviewer
+    Description: >
+      Name of the created role. Must be identical in every account for an
+      organization-wide run.
+    AllowedPattern: "^[\\w+=,.@-]{1,64}$"
+
+  RequireMFA:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >
+      Require MFA on the assume-role call. Leave false for automated runs; a machine
+      role cannot satisfy an MFA condition.
+
+  EnableCostExplorer:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >
+      Allow Cost Explorer reads, which power the spend and over-protection sections.
+      Cost Explorer bills $0.01 per request; a run issues about 7 in total (one per service it maps,
+      plus one lookup of service names), more for a very large organization.
+      Set false to omit all cost analysis.
+
+  PermissionsBoundaryArn:
+    Type: String
+    Default: ""
+    Description: >
+      Optional. ARN of an IAM managed policy to attach as a permissions boundary on the
+      created role, for organizations that require one on every role. Leave empty for none.
+      The boundary must allow the read actions in this template, or the role will be
+      unable to use them.
+    AllowedPattern: "^$|^arn:aws[a-zA-Z-]*:iam::[0-9]{12}:policy/.+$"
+    ConstraintDescription: Must be empty or an IAM policy ARN.
+
+  IsManagementAccount:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >
+      Set true ONLY in the organization management account or a delegated administrator.
+      Adds read access to Organizations structure and service control policies. Has no
+      effect in a member account, so leave false for a single-account test.
+
+Conditions:
+  EnforceMFA: !Equals [!Ref RequireMFA, "true"]
+  WithCostExplorer: !Equals [!Ref EnableCostExplorer, "true"]
+  WithOrganizations: !Equals [!Ref IsManagementAccount, "true"]
+  WithBoundary: !Not [!Equals [!Ref PermissionsBoundaryArn, ""]]
+
+Resources:
+
+  DataProtectionReviewerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      Description: Read-only metadata collection for the Cloud Data Protection Review
+      MaxSessionDuration: 14400
+      PermissionsBoundary: !If [WithBoundary, !Ref PermissionsBoundaryArn, !Ref "AWS::NoValue"]
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCollectorToAssume
+            Effect: Allow
+            Principal:
+              AWS: !Ref TrustedPrincipalArn
+            Action: sts:AssumeRole
+            # The whole Condition object is chosen by !If. Placing !If on an inner key
+            # is not valid CloudFormation and silently drops the ExternalId check.
+            Condition: !If
+              - EnforceMFA
+              - StringEquals:
+                  sts:ExternalId: !Ref ExternalId
+                Bool:
+                  aws:MultiFactorAuthPresent: "true"
+              - StringEquals:
+                  sts:ExternalId: !Ref ExternalId
+      Tags:
+        - Key: Purpose
+          Value: CloudDataProtectionReview
+        - Key: AccessLevel
+          Value: ReadOnlyMetadata
+
+  # ---------------------------------------------------------------------------
+  # 1. Inventory: what resources exist, and what tags do they carry
+  # ---------------------------------------------------------------------------
+  InventoryPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${RoleName}-Inventory"
+      Description: Discover resources and read their tags. Configuration only, no contents.
+      Roles: [!Ref DataProtectionReviewerRole]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ResourceDiscovery
+            Effect: Allow
+            Action:
+              - tag:GetResources
+              - resource-explorer-2:Search
+              - resource-explorer-2:ListIndexes
+              - config:SelectResourceConfig
+              - config:SelectAggregateResourceConfig
+              - config:DescribeConfigurationAggregators
+              - config:DescribeConfigurationRecorders
+              - config:DescribeConfigurationRecorderStatus
+            Resource: "*"
+          - Sid: PerServiceInventory
+            Effect: Allow
+            Action:
+              - ec2:DescribeRegions
+              - ec2:DescribeVolumes
+              - ec2:DescribeSnapshots
+              - rds:DescribeDBInstances
+              - rds:DescribeDBClusters
+              - rds:DescribeDBSnapshots
+              - rds:DescribeDBClusterSnapshots
+              - dynamodb:ListTables
+              - dynamodb:DescribeTable
+              - dynamodb:ListTagsOfResource
+              - s3:ListAllMyBuckets
+              - s3:GetBucketLocation
+              - s3:GetBucketTagging
+            Resource: "*"
+
+  # ---------------------------------------------------------------------------
+  # 2. Native protection mechanisms, which are separate from AWS Backup
+  # ---------------------------------------------------------------------------
+  NativeMechanismPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${RoleName}-NativeMechanisms"
+      Description: Read built-in protection settings per service (PITR, versioning, DLM, retention).
+      Roles: [!Ref DataProtectionReviewerRole]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: NativeProtectionState
+            Effect: Allow
+            Action:
+              - dynamodb:DescribeContinuousBackups
+              - dynamodb:ListBackups
+              - rds:DescribeDBSnapshotAttributes
+              - rds:DescribeDBClusterSnapshotAttributes
+              - rds:DescribeDBInstanceAutomatedBackups
+              - rds:DescribeDBClusterAutomatedBackups
+              - ec2:DescribeImages
+              - s3:GetBucketObjectLockConfiguration
+              - s3:GetBucketNotification
+              - dlm:GetLifecyclePolicies
+              - dlm:GetLifecyclePolicy
+              - s3:GetBucketVersioning
+              - s3:GetLifecycleConfiguration
+              - s3:GetReplicationConfiguration
+            Resource: "*"
+
+  # ---------------------------------------------------------------------------
+  # 3. AWS Backup: plans, vaults, lock state, job health, restore testing
+  # ---------------------------------------------------------------------------
+  AwsBackupPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${RoleName}-AwsBackup"
+      Description: Read AWS Backup configuration, vault lock state, and job outcomes.
+      Roles: [!Ref DataProtectionReviewerRole]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: BackupConfiguration
+            Effect: Allow
+            Action:
+              - backup:ListBackupPlans
+              - backup:GetBackupPlan
+              - backup:ListBackupSelections
+              - backup:GetBackupSelection
+              - backup:ListBackupVaults
+              - backup:DescribeRegionSettings
+              - backup:DescribeBackupVault
+              - backup:ListProtectedResources
+              - backup:ListRecoveryPointsByBackupVault
+              - backup:ListBackupJobs
+              - backup:ListCopyJobs
+              - backup:ListRestoreJobs
+              - backup:ListRestoreTestingPlans
+              - backup:GetRestoreTestingPlan
+              - backup:ListRestoreTestingSelections
+              - backup:GetRestoreTestingSelection
+              - backup:GetBackupVaultNotifications
+              - backup:GetBackupVaultAccessPolicy
+              - backup:ListFrameworks
+              - backup:DescribeFramework
+              - backup:ListReportPlans
+              - backup:ListLegalHolds
+              - backup:ListRecoveryPointsByLegalHold
+            Resource: "*"
+          - Sid: BackupKeyState
+            Effect: Allow
+            Action:
+              - kms:DescribeKey
+            Resource: "*"
+          - Sid: VerifyAirGappedVaultSharing
+            Effect: Allow
+            Action:
+              - ram:GetResourceShares
+            Resource: "*"
+          - Sid: MultiPartyApprovalState
+            Effect: Allow
+            Action:
+              - mpa:ListApprovalTeams
+            Resource: "*"
+
+  # ---------------------------------------------------------------------------
+  # 4. Application grouping and criticality signals
+  # ---------------------------------------------------------------------------
+  ContextPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${RoleName}-Context"
+      Description: Determine which resources belong together and which are business critical.
+      Roles: [!Ref DataProtectionReviewerRole]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ApplicationGrouping
+            Effect: Allow
+            Action:
+              - servicecatalog:ListApplications
+              - servicecatalog:ListAssociatedResources
+              - cloudformation:ListStacks
+              - cloudformation:ListStackResources
+              - ecs:ListClusters
+              - ecs:ListServices
+              - eks:ListClusters
+            Resource: "*"
+          - Sid: CriticalityAndMonitoring
+            Effect: Allow
+            Action:
+              - cloudwatch:GetMetricData
+              - cloudwatch:GetMetricStatistics
+              - cloudwatch:ListMetrics
+              - cloudwatch:DescribeAlarms
+              - events:ListRules
+            Resource: "*"
+          - Sid: AnalyticsTableFormats
+            Effect: Allow
+            Action:
+              - glue:GetDatabases
+              - glue:GetTables
+              - s3tables:ListTableBuckets
+              - s3tables:ListTables
+            Resource: "*"
+
+  # ---------------------------------------------------------------------------
+  # 5. Cost attribution (optional)
+  # ---------------------------------------------------------------------------
+  CostExplorerPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Condition: WithCostExplorer
+    Properties:
+      ManagedPolicyName: !Sub "${RoleName}-CostExplorer"
+      Description: Read 30 days of protection spend, grouped by usage type.
+      Roles: [!Ref DataProtectionReviewerRole]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: CostAttribution
+            Effect: Allow
+            Action:
+              - ce:GetCostAndUsage
+              - ce:GetDimensionValues
+            Resource: "*"
+
+  # ---------------------------------------------------------------------------
+  # 6. Organization structure and SCPs (management / delegated admin only)
+  # ---------------------------------------------------------------------------
+  OrganizationsPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Condition: WithOrganizations
+    Properties:
+      ManagedPolicyName: !Sub "${RoleName}-Organizations"
+      Description: Read account structure and check for SCPs restricting backup lifecycle APIs.
+      Roles: [!Ref DataProtectionReviewerRole]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: OrgStructureAndSCPs
+            Effect: Allow
+            Action:
+              - organizations:DescribeOrganization
+              - organizations:ListAccounts
+              - organizations:ListOrganizationalUnitsForParent
+              - organizations:ListRoots
+              - organizations:ListParents
+              - organizations:ListPolicies
+              - organizations:DescribePolicy
+              - organizations:ListTargetsForPolicy
+            Resource: "*"
+
+  # ---------------------------------------------------------------------------
+  # 7. Explicit Deny. This overrides every Allow above and every other policy
+  #    attached to this role, now or later. It is the guarantee, not a comment.
+  # ---------------------------------------------------------------------------
+  ExplicitDenyPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${RoleName}-ExplicitDeny"
+      Description: Blocks all data reads and all mutations. Overrides everything else.
+      Roles: [!Ref DataProtectionReviewerRole]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # Wildcards are used wherever the collector needs nothing from the service, so any action
+          # AWS adds later is denied too. A wildcard in a Deny only ever blocks more. Where the collector
+          # does use a service (S3, DynamoDB, RDS, EC2), only its data-read actions are named.
+          - Sid: NeverReadCustomerData
+            Effect: Deny
+            Action:
+              - s3:GetObject*
+              - dynamodb:GetItem
+              - dynamodb:BatchGet*
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:PartiQL*
+              - dynamodb:Export*
+              - dynamodb:GetRecords
+              - dynamodb:GetShardIterator
+              - rds:Download*
+              - rds-data:*
+              - ebs:*
+              - ec2:GetPasswordData
+              - ec2:GetConsoleOutput
+              - ec2:GetConsoleScreenshot
+              - kms:Decrypt
+              - kms:Encrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:GenerateMac
+              - kms:GenerateRandom
+              - kms:VerifyMac
+              - kms:Sign
+              - kms:Verify
+              - kms:DeriveSharedSecret
+              - kms:GetKeyPolicy
+              - kms:GetPublicKey
+              - kms:GetParametersForImport
+              - kms:ListGrants
+              - kms:ListRetirableGrants
+              - secretsmanager:*
+              - ssm:*
+              - logs:*
+              - athena:*
+              - lambda:*
+            Resource: "*"
+          # IAM does not support a wildcard in the service portion of an action,
+          # so a NotAction catch-all cannot be expressed. These are enumerated per
+          # service across everything the role can see.
+          - Sid: NeverMutateAnything
+            Effect: Deny
+            Action:
+              - backup:Delete*
+              - backup:Update*
+              - backup:Put*
+              - backup:Create*
+              - backup:Start*
+              - backup:Stop*
+              - backup:Disassociate*
+              - backup-storage:*
+              - s3:Put*
+              - s3:Delete*
+              - s3:Create*
+              - s3:Restore*
+              - s3:Replicate*
+              - s3:Bypass*
+              - dynamodb:Put*
+              - dynamodb:Update*
+              - dynamodb:Delete*
+              - dynamodb:Create*
+              - dynamodb:Restore*
+              - dynamodb:Import*
+              - dynamodb:BatchWrite*
+              - rds:Delete*
+              - rds:Modify*
+              - rds:Create*
+              - rds:Restore*
+              - rds:Reboot*
+              - rds:Stop*
+              - rds:Start*
+              - rds:Copy*
+              - ec2:Delete*
+              - ec2:Create*
+              - ec2:Modify*
+              - ec2:Terminate*
+              - ec2:Stop*
+              - ec2:Start*
+              - ec2:Reboot*
+              - ec2:Copy*
+              - dlm:Create*
+              - dlm:Update*
+              - dlm:Delete*
+              - kms:Create*
+              - kms:Delete*
+              - kms:Disable*
+              - kms:Schedule*
+              - kms:Revoke*
+              - kms:Put*
+              - kms:Update*
+              - kms:Enable*
+              - kms:Cancel*
+              - kms:Tag*
+              - kms:Untag*
+              - kms:Import*
+              - kms:Replicate*
+              - kms:Retire*
+              - iam:*
+              - organizations:Create*
+              - organizations:Delete*
+              - organizations:Update*
+              - organizations:Attach*
+              - organizations:Detach*
+              - organizations:Leave*
+              - organizations:Remove*
+              - cloudformation:Create*
+              - cloudformation:Delete*
+              - cloudformation:Update*
+              - cloudformation:Execute*
+              - ram:Create*
+              - ram:Delete*
+              - ram:Update*
+              - ram:Associate*
+              - ram:Disassociate*
+              - mpa:Create*
+              - mpa:Update*
+              - mpa:Delete*
+              - mpa:Start*
+              - mpa:Cancel*
+              - glue:Create*
+              - glue:Update*
+              - glue:Delete*
+              - s3tables:Create*
+              - s3tables:Update*
+              - s3tables:Delete*
+              - s3tables:Put*
+              - cloudwatch:Put*
+              - cloudwatch:Delete*
+              - cloudwatch:Set*
+              - config:Put*
+              - config:Delete*
+              - config:Start*
+              - config:Stop*
+              - events:Put*
+              - events:Delete*
+              - events:Create*
+              - events:Remove*
+              - events:Disable*
+              - events:Enable*
+              - resource-explorer-2:Create*
+              - resource-explorer-2:Delete*
+              - resource-explorer-2:Update*
+              - ebs:GetSnapshotBlock
+              - elasticfilesystem:Create*
+              - elasticfilesystem:Delete*
+              - elasticfilesystem:Modify*
+              - elasticfilesystem:Put*
+              - fsx:Create*
+              - fsx:Delete*
+              - fsx:Update*
+              - fsx:Restore*
+            Resource: "*"
+
+Outputs:
+
+  RoleArn:
+    Description: Pass this to the collector with --role-arn for a single-account run.
+    Value: !GetAtt DataProtectionReviewerRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-RoleArn"
+
+  RoleName:
+    Description: Must be identical across all accounts for an organization-wide run.
+    Value: !Ref RoleName
+
+  NextStep:
+    Description: Copy and paste this to verify the role before running a full collection.
+    Value: !Sub "python3 collector.py --preflight --role-arn ${DataProtectionReviewerRole.Arn} --external-id YOUR_EXTERNAL_ID"

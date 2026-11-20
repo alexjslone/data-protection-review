@@ -1,0 +1,9 @@
+# Runtime dependencies of collector.py, pinned to the versions the tests and live runs used.
+# This is boto3 and everything it needs. Install with: pip3 install -r requirements.txt
+boto3==1.43.108
+botocore==1.43.108
+jmespath==1.1.0
+s3transfer==0.19.2
+python-dateutil==2.9.0.post0
+six==1.17.0
+urllib3==2.8.0

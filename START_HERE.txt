@@ -1,0 +1,36 @@
+Cloud Data Protection Review: start here
+
+1. Sign in to the AWS Console and open AWS CloudShell (the >_ icon at the top). For an organization, sign in to the management account.
+2. In CloudShell, Actions > Upload file: upload this zip, then run   unzip -o DataProtectionReview_Bundle.zip && bash run.sh
+3. Answer the questions (press Enter to take the answer in [brackets]): the customer and partner names, what to assess
+   (this account, the whole organization, or the member accounts only), Cost Explorer, and which Regions to scan. It shows
+   the plan and creates nothing until you say yes. It then creates the read-only role (you can read the template first),
+   checks access, runs the assessment and zips the results. Nothing needs installing.
+4. Download the Results ZIP it prints with Actions > Download file, and open report.html from it in a browser.
+5. When you are done:   bash cleanup.sh   It finds what was created, in every Region, and asks before removing anything.
+
+Without the questions, one command does it: bash run.sh account, bash run.sh org, or bash run.sh org --no-management-role
+(add --org-name "Customer" --partner-name "Partner"; settings.txt, if present, holds the names). bash run.sh --help lists the options.
+An organization that does not allow sts:AssumeRole: Deployment_Guide.html, "Organization without sts:AssumeRole" (IAM Identity
+Center; run.sh does not cover it).
+
+The person running it needs permission to create the CloudFormation stack and to assume the role it creates (sts:AssumeRole).
+Deployment_Guide.html explains each step, what to do if one fails, and how to remove access.
+
+What is in this folder
+  run.sh                           asks a few questions, then does the guide's steps in order, printing each AWS command first
+  cleanup.sh                       when you are done: finds and removes what run.sh created, asking before it removes anything
+  Deployment_Guide.html            how to deploy and run it step by step, for one account or a whole organization
+  data_risk_assessment_role.yaml   the CloudFormation template that creates the read-only role (read it before deploying)
+  data_risk_assessment_org.yaml    the same role for a whole organization: the management account's role plus a StackSet that creates it in every member account (it embeds the role template unchanged)
+  data_risk_assessment_permission_set.yaml  the same read-only policy as an IAM Identity Center permission set, for
+                                   organizations that do not allow sts:AssumeRole (no IAM role or StackSet to create)
+  collector.py                     the read-only collector; it only calls AWS APIs and writes files to the folder you choose
+  requirements.txt                 the one library it needs (boto3), pinned
+  SECURITY_REVIEW.md               every permission the role grants and why, for your security team
+  Sample_Report_made_up_data.html  what the report looks like for one account, with made-up data
+  Sample_Organization_Report_made_up_data.html  what it looks like for an organization (8 accounts), with made-up data
+
+The tool reads configuration metadata only. It does not read object contents, table items, secrets or parameter values, creates
+or changes nothing in your environment except the CloudFormation stack that holds the read-only role, and sends nothing anywhere
+except to AWS. You can delete the role at any time; the guide's "Removing access" section has the lines.
